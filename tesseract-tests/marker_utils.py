@@ -139,6 +139,48 @@ def detect_rectangles(image):
     detected_contours = cv2.drawContours(detected_contours, cts, -1, (0,255,0), 3)
     return cts, detected_contours, markers
 
+def detect_id_plates(image, min_area=1000, min_error_poly=5):
+    """Function to detect the four corners of a marker"""
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    filter_size = 21
+    subs_mean = 10
+    th1 = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, filter_size, subs_mean)
+    th1 = 255 - th1
+    contours, _ = cv2.findContours(th1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    detected_contours = image.copy()
+   
+    # Remove small contours
+    cts = []
+    contornos_grandes = 0
+    contornos_cuadrados = 0
+    print("Contornos totales: ", len(contours))
+    for c in contours:
+        ret = cv2.contourArea(c)
+        if ret > min_area:
+            contornos_grandes +=1
+            approxCts = cv2.approxPolyDP(c, min_error_poly, True)
+            if cv2.isContourConvex(approxCts) and len(approxCts) == 4:
+                contornos_cuadrados +=1
+                pt = np.reshape(approxCts, (4, 2))
+                pt = order_points(pt)
+                cts.append(pt)
+    print("Contornos grandes: ", contornos_grandes)
+    print("Contornos cuadrados: ", contornos_cuadrados)
+    print("Contornos que pasa filtro: ", len(cts))
+
+    markers = []
+    for c in cts:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        h, _ = cv2.findHomography(c, pts_dst)
+        marker = cv2.warpPerspective(gray, h, (400, 200))
+        markers.append(marker)
+
+    detected_contours = cv2.drawContours(detected_contours, contours, -1, (0,0,255), 1)
+    detected_contours = cv2.drawContours(detected_contours, cts, -1, (0,255,0), 2)
+    return cts, detected_contours,markers
+
 def estimate_marker_pose(image, corners, K, dist_coeffs, marker_length):
     """Function to estiamte marker pose"""
     rotations = []
